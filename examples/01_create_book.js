@@ -18,7 +18,7 @@ async function main() {
   const book = await client.books.create({
     bookSpecUid: 'SQUAREBOOK_HC',
     title: '테스트 포토북',
-    creationType: 'TEST',
+    creationType: 'TEMPLATE',
   });
   const bookUid = book.bookUid || book.uid;
   console.log('책 생성 완료:', bookUid);
