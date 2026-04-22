@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Sweetbook API Node.js SDK",
   "main": "index.js",
+  "types": "index.d.ts",
   "scripts": {
     "example:book": "node examples/01_create_book.js",
     "example:order": "node examples/02_order.js",

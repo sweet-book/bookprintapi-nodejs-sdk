@@ -137,6 +137,33 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
 | 1차 재시도 | 1초 |
 | 2차 재시도 | 2초 |
 
+## TypeScript
+
+TypeScript 타입 정의(`index.d.ts`)가 번들되어 있어 별도 설치 없이 자동완성과 타입 체크를 지원합니다. 핵심 도메인(Books/Covers/Contents/Orders)의 요청·응답 타입을 제공하며, Photos/Credits 는 느슨한 타입(`Record<string, unknown>`)으로 노출됩니다.
+
+```typescript
+import {
+  SweetbookClient,
+  type BookCreateRequest,
+  type CreateOrderRequest,
+} from 'bookprintapi-nodejs-sdk';
+
+const client = new SweetbookClient({ apiKey: 'SB_...', environment: 'sandbox' });
+
+const req: BookCreateRequest = {
+  bookSpecUid: 'SQUAREBOOK_HC',
+  title: '내 포토북',
+  creationType: 'TEMPLATE',
+};
+const book = await client.books.create(req);
+```
+
+Node 전용 타입(`Buffer` 등)을 참조하므로 TypeScript 프로젝트에서는 `@types/node` 가 필요합니다.
+
+```bash
+npm install --save-dev @types/node
+```
+
 ## 커스터마이징
 
 | 파일 | 수정 내용 |
