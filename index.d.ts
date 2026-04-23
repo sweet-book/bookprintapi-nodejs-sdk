@@ -328,6 +328,38 @@ export class OrdersClient {
 }
 
 // ============================================================
+// PDFs — PDF_UPLOAD / MIX_COVER_TEMPLATE 모드용
+// ============================================================
+
+/** 업로드할 PDF 파일. File / Blob / Buffer / ReadStream 등 FormData 가 받을 수 있는 값. */
+export type PdfFile = unknown;
+
+export interface PdfUploadResult {
+  /** 검증 결과 */
+  valid?: boolean;
+  /** 페이지 수 (내지 PDF) */
+  pageCount?: number;
+  /** 검증 메시지 */
+  messages?: string[];
+  [extra: string]: unknown;
+}
+
+export class PdfsClient {
+  /** 표지 PDF 신규 등록 (이미 있으면 409) */
+  uploadCover(bookUid: string, file: PdfFile): Promise<PdfUploadResult>;
+  /** 표지 PDF 교체 (없으면 404) */
+  replaceCover(bookUid: string, file: PdfFile): Promise<PdfUploadResult>;
+  /** 표지 PDF 바이너리 다운로드 */
+  downloadCover(bookUid: string): Promise<Buffer | ArrayBuffer>;
+  /** 내지 PDF 신규 등록 (이미 있으면 409) */
+  uploadContents(bookUid: string, file: PdfFile): Promise<PdfUploadResult>;
+  /** 내지 PDF 교체 (없으면 404) */
+  replaceContents(bookUid: string, file: PdfFile): Promise<PdfUploadResult>;
+  /** 내지 PDF 바이너리 다운로드 */
+  downloadContents(bookUid: string): Promise<Buffer | ArrayBuffer>;
+}
+
+// ============================================================
 // Photos / Credits — 향후 번들 대상, 현재는 느슨한 타입으로만 노출
 // ============================================================
 
@@ -364,6 +396,7 @@ export class SweetbookClient {
   readonly orders: OrdersClient;
   readonly photos: PhotosClient;
   readonly credits: CreditsClient;
+  readonly pdfs: PdfsClient;
 }
 
 export class SweetbookApiError extends Error {
