@@ -17,11 +17,11 @@ const client = new SweetbookClient({
   environment: 'sandbox',  // 'sandbox' | 'live'
 });
 
-// 책 생성
+// 책 생성 — creationType: 'TEMPLATE' | 'PDF_UPLOAD' | 'MIX_COVER_TEMPLATE'
 const book = await client.books.create({
   bookSpecUid: 'SQUAREBOOK_HC',
   title: '내 포토북',
-  creationType: 'TEST',
+  creationType: 'TEMPLATE',
 });
 console.log('bookUid:', book.bookUid);
 ```
