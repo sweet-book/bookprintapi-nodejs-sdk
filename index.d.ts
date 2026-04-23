@@ -328,6 +328,62 @@ export class OrdersClient {
 }
 
 // ============================================================
+// Templates — 목록/상세 조회 (읽기 전용)
+// ============================================================
+
+export type TemplateScope = "public" | "private" | "all";
+export type TemplateKind = "cover" | "content" | "divider" | "publish";
+
+export interface TemplateListParams {
+  scope?: TemplateScope;
+  bookSpecUid?: string;
+  specProfileUid?: string;
+  templateKind?: TemplateKind;
+  category?: string;
+  templateName?: string;
+  theme?: string;
+  sort?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface TemplateListItem {
+  templateUid: string;
+  templateName: string;
+  templateKind?: string;
+  bookSpecUid?: string | null;
+  thumbnailUrl?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  [extra: string]: unknown;
+}
+
+export interface TemplatesListResult {
+  templates: TemplateListItem[];
+  pagination: Pagination;
+  [extra: string]: unknown;
+}
+
+export interface TemplateDetail {
+  templateUid: string;
+  templateName: string;
+  templateKind?: string;
+  bookSpecUid?: string | null;
+  /** 플레이스홀더 바인딩 스펙 */
+  parameters?: Record<string, unknown> | null;
+  /** 레이아웃 JSON */
+  layout?: Record<string, unknown> | null;
+  /** 배치 규칙 JSON */
+  layoutRules?: Record<string, unknown> | null;
+  [extra: string]: unknown;
+}
+
+export class TemplatesClient {
+  list(params?: TemplateListParams): Promise<TemplatesListResult>;
+  get(templateUid: string, options?: { accountUid?: string }): Promise<TemplateDetail>;
+}
+
+// ============================================================
 // PDFs — PDF_UPLOAD / MIX_COVER_TEMPLATE 모드용
 // ============================================================
 
@@ -397,6 +453,7 @@ export class SweetbookClient {
   readonly photos: PhotosClient;
   readonly credits: CreditsClient;
   readonly pdfs: PdfsClient;
+  readonly templates: TemplatesClient;
 }
 
 export class SweetbookApiError extends Error {
