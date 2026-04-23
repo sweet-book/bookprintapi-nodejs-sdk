@@ -498,9 +498,14 @@ export class SweetbookClient {
 }
 
 export class SweetbookApiError extends Error {
-  status?: number;
-  code?: string;
-  details?: unknown;
+  /** HTTP 상태 코드 */
+  statusCode?: number;
+  /** 서버 error_code (있는 경우) */
+  errorCode?: string | null;
+  /** ApiResponse.Fail 의 errors 배열 (또는 legacy error.details) */
+  details?: string[] | unknown | null;
+  /** 원본 Response 객체 */
+  response?: Response;
 }
 
 export class SweetbookNetworkError extends Error {
