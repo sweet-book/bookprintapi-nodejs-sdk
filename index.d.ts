@@ -58,8 +58,47 @@ export interface BookCreateRequest {
   [extra: string]: unknown;
 }
 
+/**
+ * C04 이후 책 관련 응답에 동봉되는 페이지 메타. `isValid` 가 true 면
+ * 페이지 규칙상 finalize 가능 (그 외 전제조건(DRAFT·PDF 업로드 등)은 별도).
+ */
+export interface PageMeta {
+  /** 현재 누적 내지 페이지 수 (표지 제외, 음수 방어 적용) */
+  currentPageCount: number;
+  /** BookSpec 기준 최소 페이지 수 */
+  pageMin: number;
+  /** BookSpec 기준 최대 페이지 수 */
+  pageMax: number;
+  /** 페이지 증분 단위 */
+  pageIncrement: number;
+  /** `pageMin ≤ current ≤ pageMax && (current - pageMin) % pageIncrement === 0` */
+  isValid: boolean;
+}
+
 export interface BookCreateResponse {
   bookUid: string;
+  /** C04: POST /books 응답에 동봉. 생성 직후엔 BookSpec 미조회로 모든 값 0 가능 */
+  pageMeta?: PageMeta;
+}
+
+/** C04 신규 엔드포인트 `GET /books/{uid}` 응답 (단건 조회 풀셋) */
+export interface BookDetailResponse {
+  bookUid: string;
+  accountUid?: string | null;
+  title: string;
+  bookSpecUid: string;
+  bookSpecName?: string | null;
+  specProfileUid?: string | null;
+  creationType: CreationType | string;
+  /** 숫자 상태 코드 (1=draft, 2=finalized 등) */
+  status: number;
+  coverTemplateUid?: string | null;
+  externalRef?: string | null;
+  isTest: boolean;
+  pageMeta: PageMeta;
+  createdAt: string;
+  updatedAt: string;
+  [extra: string]: unknown;
 }
 
 export interface BookListItem {
@@ -96,14 +135,16 @@ export interface BookListParams {
 
 export interface BookFinalizationResponse {
   result: string;
-  pageCount: number;
+  /** C04: 기존 `pageCount` 대체 */
+  pageMeta: PageMeta;
   finalizedAt: string;
 }
 
 export class BooksClient {
   list(params?: BookListParams): Promise<BooksListResult>;
   create(data: BookCreateRequest): Promise<BookCreateResponse>;
-  get(bookUid: string): Promise<BookListItem>;
+  /** C04 이후 신규 `GET /books/{uid}` 엔드포인트 호출 — 단건 풀셋 응답 */
+  get(bookUid: string): Promise<BookDetailResponse>;
   finalize(bookUid: string): Promise<BookFinalizationResponse>;
   delete(bookUid: string): Promise<unknown>;
 }
@@ -462,8 +503,8 @@ export type PdfFile = unknown;
 export interface PdfUploadResult {
   /** 검증 결과 */
   valid?: boolean;
-  /** 페이지 수 (내지 PDF) */
-  pageCount?: number;
+  /** C04: 기존 `pageCount` 대체. 업로드 후 반영된 책 페이지 메타 */
+  pageMeta?: PageMeta;
   /** 검증 메시지 */
   messages?: string[];
   [extra: string]: unknown;
