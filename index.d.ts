@@ -221,32 +221,12 @@ export interface EstimateResponse {
   currency: string;
 }
 
-/** 주문 상태 문자열 enum (C19 이후 서버 응답) */
-export type OrderStatus =
-  | "PAID_AWAITING_CONTENT"
-  | "PAID"
-  | "PDF_READY"
-  | "CONFIRMED"
-  | "IN_PRODUCTION"
-  | "COMPLETED"
-  | "PRODUCTION_COMPLETE"
-  | "SHIPPED"
-  | "DELIVERED"
-  | "CANCELLED"
-  | "CANCELLED_REFUND"
-  | "ERROR";
-
-/** 항목 상태 문자열 enum — Order 와 겹치는 값 집합 */
-export type OrderItemStatus = OrderStatus;
-
 export interface OrderListItem {
   orderUid: string;
   accountUid: string;
   orderType: string;
   externalRef?: string | null;
-  orderStatus: OrderStatus;
-  /** 관리자 응답에만 포함되는 숫자 코드 (20, 25, 30, ...) */
-  orderStatusCode?: number;
+  orderStatus: number;
   orderStatusDisplay: string;
   totalAmount: number;
   paidCreditAmount: number;
@@ -259,10 +239,6 @@ export interface OrderListItem {
   [extra: string]: unknown;
 }
 
-/**
- * C19 평탄화 이후 `GET /orders` 응답 매핑.
- * SDK 는 편의를 위해 `data` 배열을 `orders` 키로 감싸서 반환.
- */
 export interface OrderListResponse {
   orders: OrderListItem[];
   pagination: Pagination;
@@ -271,8 +247,7 @@ export interface OrderListResponse {
 export interface OrderListParams {
   limit?: number;
   offset?: number;
-  /** C19 이후 문자열 enum. 숫자도 서버가 허용하면 통과하지만 권장은 enum */
-  status?: OrderStatus | string;
+  status?: string;
   from?: string;
   to?: string;
 }
@@ -287,9 +262,7 @@ export interface OrderItemDetail {
   pageCount: number;
   unitPrice: number;
   itemAmount: number;
-  itemStatus: OrderItemStatus;
-  /** 관리자 응답에만 포함 */
-  itemStatusCode?: number;
+  itemStatus: number;
   itemStatusDisplay: string;
   trackingNumber?: string | null;
   trackingCarrier?: string | null;
@@ -303,9 +276,7 @@ export interface OrderDetailResponse {
   accountUid: string;
   orderType: string;
   externalRef?: string | null;
-  orderStatus: OrderStatus;
-  /** 관리자 응답에만 포함 */
-  orderStatusCode?: number;
+  orderStatus: number;
   orderStatusDisplay: string;
   isTest: boolean;
   totalProductAmount: number;
