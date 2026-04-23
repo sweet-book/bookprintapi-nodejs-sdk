@@ -328,6 +328,46 @@ export class OrdersClient {
 }
 
 // ============================================================
+// BookSpecs — 상품 스펙 조회 (읽기 전용)
+// ============================================================
+
+export interface BookSpecDto {
+  bookSpecUid: string;
+  name?: string | null;
+  innerTrimWidthMm?: number | null;
+  innerTrimHeightMm?: number | null;
+  pageMin?: number | null;
+  pageMax?: number | null;
+  pageDefault?: number | null;
+  pageIncrement?: number | null;
+  coverType?: string | null;
+  bindingType?: string | null;
+  bindingEdge?: string | null;
+  priceCurrency?: string | null;
+  priceBase?: number | null;
+  pricePerIncrement?: number | null;
+  sandboxPriceBase?: number | null;
+  sandboxPricePerIncrement?: number | null;
+  paper?: Record<string, unknown> | null;
+  /** 관리자 전용 필드 (일반 사용자에게는 null 반환) */
+  bookSpecId?: number | null;
+  ebookProductId?: number | null;
+  production?: Record<string, unknown> | null;
+  bleed?: Record<string, unknown> | null;
+  pdfSize?: Record<string, unknown> | null;
+  layoutSize?: Record<string, unknown> | null;
+  spineRules?: Record<string, unknown> | null;
+  visibility?: string | null;
+  ownerAccountUid?: string | null;
+  [extra: string]: unknown;
+}
+
+export class BookSpecsClient {
+  list(options?: { accountUid?: string }): Promise<BookSpecDto[]>;
+  get(bookSpecUid: string, options?: { accountUid?: string }): Promise<BookSpecDto>;
+}
+
+// ============================================================
 // Templates — 목록/상세 조회 (읽기 전용)
 // ============================================================
 
@@ -454,6 +494,7 @@ export class SweetbookClient {
   readonly credits: CreditsClient;
   readonly pdfs: PdfsClient;
   readonly templates: TemplatesClient;
+  readonly bookSpecs: BookSpecsClient;
 }
 
 export class SweetbookApiError extends Error {
