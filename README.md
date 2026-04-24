@@ -8,7 +8,7 @@ npm 레지스트리가 아니라 **GitHub 태그**에서 바로 설치합니다.
 
 ```bash
 # 최신 안정 태그 기준
-npm install github:sweet-book/bookprintapi-nodejs-sdk#v0.1.0
+npm install github:sweet-book/bookprintapi-nodejs-sdk#v0.1.1
 ```
 
 또는 `package.json`에 직접 선언:
@@ -16,13 +16,13 @@ npm install github:sweet-book/bookprintapi-nodejs-sdk#v0.1.0
 ```json
 {
   "dependencies": {
-    "bookprintapi": "github:sweet-book/bookprintapi-nodejs-sdk#v0.1.0"
+    "bookprintapi": "github:sweet-book/bookprintapi-nodejs-sdk#v0.1.1"
   }
 }
 ```
 
 > 태그 목록: [Releases](https://github.com/sweet-book/bookprintapi-nodejs-sdk/tags)
-> 버전 올리기: `package.json`의 `#v0.1.0` 부분만 바꾸고 `npm install`
+> 버전 올리기: `package.json`의 `#v0.1.1` 부분만 바꾸고 `npm install`
 
 ## 빠른 시작
 
