@@ -2,15 +2,36 @@
 
 Sweetbook API를 Node.js에서 사용하기 위한 SDK입니다.
 
+## 설치
+
+npm 레지스트리가 아니라 **GitHub 태그**에서 바로 설치합니다. 별도 계정/사내 레지스트리 불필요.
+
+```bash
+# 최신 안정 태그 기준
+npm install github:sweet-book/bookprintapi-nodejs-sdk#v0.1.0
+```
+
+또는 `package.json`에 직접 선언:
+
+```json
+{
+  "dependencies": {
+    "bookprintapi": "github:sweet-book/bookprintapi-nodejs-sdk#v0.1.0"
+  }
+}
+```
+
+> 태그 목록: [Releases](https://github.com/sweet-book/bookprintapi-nodejs-sdk/tags)
+> 버전 올리기: `package.json`의 `#v0.1.0` 부분만 바꾸고 `npm install`
+
 ## 빠른 시작
 
 ```bash
-npm install
 cp .env.example .env   # API Key 편집
 ```
 
 ```javascript
-const { SweetbookClient } = require('bookprintapi-nodejs-sdk');
+const { SweetbookClient } = require('bookprintapi');
 
 const client = new SweetbookClient({
   apiKey: 'SB_YOUR_API_KEY',
@@ -69,6 +90,23 @@ node examples/02_order.js
 node examples/03_webhook_server.js
 ```
 
+### 4. 책 생성 → 주문 E2E 파이프라인
+
+```bash
+node examples/server_pipeline.js
+```
+
+자세한 시퀀스 설명은 [`examples/README.md`](examples/README.md) 참고.
+
+## 관련 예제 앱 (3-tier 레퍼런스)
+
+SDK를 **파트너 백엔드에 두고** 브라우저에서는 직접 호출하지 않는 구조의 풀스택 demo:
+
+- [`partner-order-demo`](../partner-order-demo) — 파트너 주문 프로그램 (프론트 → 백엔드(SDK 소유) → Sweetbook API)
+
+> ⚠️ **SDK를 브라우저에 번들하지 마세요.** API Key가 클라이언트에 노출됩니다.
+> 권장 구조: 브라우저 → 파트너 백엔드(이 SDK 사용) → Sweetbook API
+
 ## 환경 설정
 
 `.env` 파일 또는 환경변수로 설정:
@@ -93,7 +131,7 @@ const client = new SweetbookClient({
 ## 에러 처리
 
 ```javascript
-const { SweetbookApiError, SweetbookNetworkError } = require('bookprintapi-nodejs-sdk');
+const { SweetbookApiError, SweetbookNetworkError } = require('bookprintapi');
 
 try {
   await client.books.get('invalid-uid');
@@ -110,7 +148,7 @@ try {
 ## 웹훅 서명 검증
 
 ```javascript
-const { verifySignature } = require('bookprintapi-nodejs-sdk');
+const { verifySignature } = require('bookprintapi');
 
 // Express 예시
 app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
@@ -146,7 +184,7 @@ import {
   SweetbookClient,
   type BookCreateRequest,
   type CreateOrderRequest,
-} from 'bookprintapi-nodejs-sdk';
+} from 'bookprintapi';
 
 const client = new SweetbookClient({ apiKey: 'SB_...', environment: 'sandbox' });
 

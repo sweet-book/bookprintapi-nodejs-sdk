@@ -1,6 +1,8 @@
 /**
  * 예제 3: 웹훅 수신 서버
  *
+ * ⚠️  이 서버도 백엔드 프로세스입니다. 공인 HTTPS 엔드포인트 뒤에서 운영하세요.
+ *
  * 실행: node examples/03_webhook_server.js
  * 테스트: curl -X POST http://localhost:3000/webhook -H "Content-Type: application/json" -d '{"event":"order.shipped"}'
  */

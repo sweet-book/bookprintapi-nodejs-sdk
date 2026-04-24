@@ -1,6 +1,9 @@
 /**
  * 예제 1: 책 생성 → 표지 → 내지 → 최종화
  *
+ * ⚠️  백엔드 실행 전제. SDK를 브라우저/프론트엔드에 번들하지 마세요.
+ *     (전체 파이프라인 예제는 server_pipeline.js 참고)
+ *
  * 실행: node examples/01_create_book.js
  */
 
