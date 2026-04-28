@@ -9,14 +9,28 @@
  */
 
 const { SweetbookClient } = require('./lib/client');
-const { SweetbookApiError, SweetbookNetworkError, SweetbookValidationError, ResponseParser } = require('./lib/core');
-const { verifySignature } = require('./lib/webhook');
-
-module.exports = {
-  SweetbookClient,
+const {
+  FieldError,
   SweetbookApiError,
   SweetbookNetworkError,
   SweetbookValidationError,
   ResponseParser,
+} = require('./lib/core');
+const { ErrorCodes, ConstraintTypes } = require('./lib/errorcodes');
+const { OrderStatus, ORDER_STATUS_CODE, ORDER_STATUS_FROM_CODE } = require('./lib/order_status');
+const { verifySignature } = require('./lib/webhook');
+
+module.exports = {
+  SweetbookClient,
+  FieldError,
+  SweetbookApiError,
+  SweetbookNetworkError,
+  SweetbookValidationError,
+  ResponseParser,
+  ErrorCodes,
+  ConstraintTypes,
+  OrderStatus,
+  ORDER_STATUS_CODE,
+  ORDER_STATUS_FROM_CODE,
   verifySignature,
 };

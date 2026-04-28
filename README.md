@@ -130,20 +130,87 @@ const client = new SweetbookClient({
 
 ## 에러 처리
 
+서버 응답은 6필드 고정 shape: `success` / `errorCode` / `message` / `data` / `errors` / `fieldErrors`.
+**`err.errorCode`로 기계 분기**, **`err.userMessage()`로 사용자 표시**가 표준 패턴.
+
 ```javascript
-const { SweetbookApiError, SweetbookNetworkError } = require('bookprintapi');
+const {
+  SweetbookApiError,
+  SweetbookNetworkError,
+  ErrorCodes,
+  ConstraintTypes,
+} = require('bookprintapi');
 
 try {
-  await client.books.get('invalid-uid');
+  await client.books.finalize('bk_xxx');
 } catch (err) {
   if (err instanceof SweetbookApiError) {
-    console.log('API 에러:', err.statusCode, err.message);
-    console.log('상세:', err.details);
+    console.log(err.statusCode, err.errorCode);    // 400, "ERR_INSUFFICIENT_PAGES"
+    console.log(err.userMessage());                 // errors[0] 또는 message 폴백
+
+    // errorCode 기반 기계 분기 — 메시지 문자열 파싱 금지
+    switch (err.errorCode) {
+      case ErrorCodes.INSUFFICIENT_PAGES: {
+        const fe = err.fieldError('pageCount');
+        console.log(`최소 ${fe.requiredValue}p 필요, 현재 ${fe.currentValue}p`);
+        break;
+      }
+      case ErrorCodes.PAGECOUNT_INVALID: {
+        const fe = err.fieldError('pageCount');
+        if (fe.constraint === ConstraintTypes.MAX) console.log(`최대 ${fe.requiredValue}p 초과`);
+        else if (fe.constraint === ConstraintTypes.INCREMENT) console.log('증분 규칙 위반');
+        break;
+      }
+      case ErrorCodes.FINALIZE_PREREQ_UNMET:
+        for (const fe of err.fieldErrors) console.log(`미충족: ${fe.field}`);
+        break;
+      case ErrorCodes.INSUFFICIENT_CREDIT:
+        // err.data 에 진단: { required, balance, currency }
+        console.log(`필요 ${err.data.required}, 잔액 ${err.data.balance}`);
+        break;
+      case ErrorCodes.ENV_MISMATCH:
+        console.log('호출 도메인과 책 환경(sandbox/live) 불일치');
+        break;
+      case ErrorCodes.SANDBOX_UNSUPPORTED:
+        console.log('이 엔드포인트는 Live 전용입니다');
+        break;
+      default:
+        console.log(err.userMessage());
+    }
   } else if (err instanceof SweetbookNetworkError) {
     console.log('네트워크 에러:', err.message);
   }
 }
 ```
+
+### errorCode 카탈로그 (24종)
+
+| 카테고리 | 상수 | HTTP |
+|---|---|---|
+| Generic | `VALIDATION_FAILED` / `MALFORMED_REQUEST` / `UNAUTHORIZED` / `FORBIDDEN` / `NOT_FOUND` / `CONFLICT` / `TOO_MANY_REQUESTS` / `INTERNAL_ERROR` | 400~500 |
+| 페이지/책 | `INSUFFICIENT_PAGES` / `PAGECOUNT_INVALID` / `FINALIZE_PREREQ_UNMET` / `CREATION_TYPE_UNSUPPORTED` | 400 |
+| 템플릿 | `TEMPLATE_BINDING_MISSING` / `TEMPLATE_PARAM_REQUIRED` | 400 |
+| 주문 | `ORDER_TRANSITION_INVALID` (400) / `INSUFFICIENT_CREDIT` (402) | 400/402 |
+| 환경 | `ENV_MISMATCH` (403) / `SANDBOX_UNSUPPORTED` (501) | 403/501 |
+| 멱등성 | `IDEMPOTENCY_KEY_MISMATCH` | 422 |
+| PDF | `PDF_NOT_UPLOADED` (404) / `PDF_NOT_GENERATED` (409) / `PDF_PENDING` (409) / `PDF_GENERATION_FAILED` (422) / `PDF_FILE_MISSING` (500) | 404~500 |
+
+### 주문 상태 enum
+
+`OrderStatus.*` 문자열 상수 12종. 응답 `orderStatus` / `itemStatus` 와 직접 비교.
+
+```javascript
+const { OrderStatus } = require('bookprintapi');
+const order = await client.orders.get('ord_xxx');
+
+if (order.orderStatus === OrderStatus.PAID) {
+  // ...
+} else if ([OrderStatus.SHIPPED, OrderStatus.DELIVERED].includes(order.orderStatus)) {
+  // ...
+}
+```
+
+> 관리자 응답에는 `orderStatusCode` (숫자 코드, 20/25/30/...) 도 함께 노출됨. 일반 응답에는 `orderStatus` (string) 와 `orderStatusDisplay` (한글) 만.
 
 ## 웹훅 서명 검증
 

@@ -4,6 +4,14 @@
  *
  * 핵심 도메인: Books / Covers / Contents / Orders
  * (Photos / Credits / Webhook 타입은 향후 번들에서 추가 예정)
+ *
+ * v0.2.0 — 99번 v1 마이그레이션 반영:
+ *  - 6필드 응답 shape (errorCode / fieldErrors)
+ *  - 주문 상태 string enum (orderStatus: OrderStatus, orderStatusCode? 분리)
+ *  - 목록 응답 평탄화 (data: T[] + 최상위 pagination)
+ *  - PageMeta (책 생성·내지·표지·finalize·PDF 응답)
+ *  - GET /templates/{uid}/schema
+ *  - errorCode 카탈로그 24종 (ErrorCodes)
  */
 
 // ============================================================
@@ -28,11 +36,119 @@ export interface Pagination {
   hasNext: boolean;
 }
 
+/** 페이지 제약 메타 — master_대비_변경사항.md § 8 */
+export interface PageMeta {
+  /** 현재 누적 내지 페이지 수 (표지 제외, 0 이상) */
+  currentPageCount: number;
+  /** 최소 페이지 수 (BookSpec 기준) */
+  pageMin: number;
+  /** 최대 페이지 수 (BookSpec 기준) */
+  pageMax: number;
+  /** 페이지 증분 단위 */
+  pageIncrement: number;
+  /** 제약 만족 여부: pageMin ≤ current ≤ pageMax && (current - pageMin) % pageIncrement == 0 */
+  isValid: boolean;
+}
+
 /** 템플릿 파라미터. 서버에서 Dictionary<string, object> 로 받음. */
 export type TemplateParameters = Record<string, unknown>;
 
 /** 템플릿에 첨부하는 파일. Blob / Buffer / ReadStream 등 FormData 가 받을 수 있는 값. */
 export type TemplateFile = unknown;
+
+// ============================================================
+// errorCode / FieldError 카탈로그 (master_대비_변경사항.md § 1, § 2)
+// ============================================================
+
+/** fieldErrors[].constraint 열거값 */
+export type ConstraintType =
+  | "min"
+  | "max"
+  | "increment"
+  | "enum"
+  | "pattern"
+  | "required";
+
+export interface FieldErrorObject {
+  field: string;
+  message: string;
+  currentValue?: unknown;
+  requiredValue?: unknown;
+  constraint?: ConstraintType | string;
+}
+
+export class FieldError implements FieldErrorObject {
+  constructor(obj?: Partial<FieldErrorObject>);
+  field: string;
+  message: string;
+  currentValue: unknown;
+  requiredValue: unknown;
+  constraint: ConstraintType | string | null;
+  static from(obj: unknown): FieldError | null;
+}
+
+/** 24종 errorCode 식별자 카탈로그 */
+export const ErrorCodes: {
+  readonly VALIDATION_FAILED: "ERR_VALIDATION_FAILED";
+  readonly MALFORMED_REQUEST: "ERR_MALFORMED_REQUEST";
+  readonly UNAUTHORIZED: "ERR_UNAUTHORIZED";
+  readonly FORBIDDEN: "ERR_FORBIDDEN";
+  readonly NOT_FOUND: "ERR_NOT_FOUND";
+  readonly CONFLICT: "ERR_CONFLICT";
+  readonly TOO_MANY_REQUESTS: "ERR_TOO_MANY_REQUESTS";
+  readonly INTERNAL_ERROR: "ERR_INTERNAL_ERROR";
+  readonly INSUFFICIENT_PAGES: "ERR_INSUFFICIENT_PAGES";
+  readonly PAGECOUNT_INVALID: "ERR_PAGECOUNT_INVALID";
+  readonly FINALIZE_PREREQ_UNMET: "ERR_FINALIZE_PREREQ_UNMET";
+  readonly CREATION_TYPE_UNSUPPORTED: "ERR_CREATION_TYPE_UNSUPPORTED";
+  readonly TEMPLATE_BINDING_MISSING: "ERR_TEMPLATE_BINDING_MISSING";
+  readonly TEMPLATE_PARAM_REQUIRED: "ERR_TEMPLATE_PARAM_REQUIRED";
+  readonly ORDER_TRANSITION_INVALID: "ERR_ORDER_TRANSITION_INVALID";
+  readonly INSUFFICIENT_CREDIT: "ERR_INSUFFICIENT_CREDIT";
+  readonly ENV_MISMATCH: "ERR_ENV_MISMATCH";
+  readonly SANDBOX_UNSUPPORTED: "ERR_SANDBOX_UNSUPPORTED";
+  readonly IDEMPOTENCY_KEY_MISMATCH: "ERR_IDEMPOTENCY_KEY_MISMATCH";
+  readonly PDF_NOT_UPLOADED: "ERR_PDF_NOT_UPLOADED";
+  readonly PDF_NOT_GENERATED: "ERR_PDF_NOT_GENERATED";
+  readonly PDF_PENDING: "ERR_PDF_PENDING";
+  readonly PDF_GENERATION_FAILED: "ERR_PDF_GENERATION_FAILED";
+  readonly PDF_FILE_MISSING: "ERR_PDF_FILE_MISSING";
+};
+
+export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
+
+export const ConstraintTypes: {
+  readonly MIN: "min";
+  readonly MAX: "max";
+  readonly INCREMENT: "increment";
+  readonly ENUM: "enum";
+  readonly PATTERN: "pattern";
+  readonly REQUIRED: "required";
+};
+
+// ============================================================
+// Order 상태 enum (master_대비_변경사항.md § 7)
+// ============================================================
+
+export const OrderStatus: {
+  readonly PAID_AWAITING_CONTENT: "PAID_AWAITING_CONTENT";
+  readonly PAID: "PAID";
+  readonly PDF_READY: "PDF_READY";
+  readonly CONFIRMED: "CONFIRMED";
+  readonly IN_PRODUCTION: "IN_PRODUCTION";
+  readonly COMPLETED: "COMPLETED";
+  readonly PRODUCTION_COMPLETE: "PRODUCTION_COMPLETE";
+  readonly SHIPPED: "SHIPPED";
+  readonly DELIVERED: "DELIVERED";
+  readonly CANCELLED: "CANCELLED";
+  readonly CANCELLED_REFUND: "CANCELLED_REFUND";
+  readonly ERROR: "ERROR";
+};
+
+export type OrderStatusValue = (typeof OrderStatus)[keyof typeof OrderStatus];
+
+export const ORDER_STATUS_CODE: Readonly<Record<OrderStatusValue, number>>;
+export const ORDER_STATUS_FROM_CODE: Readonly<Record<number, OrderStatusValue>>;
 
 // ============================================================
 // Books
@@ -60,6 +176,28 @@ export interface BookCreateRequest {
 
 export interface BookCreateResponse {
   bookUid: string;
+  /** 생성 직후 currentPageCount=0, isValid=false */
+  pageMeta: PageMeta;
+  [extra: string]: unknown;
+}
+
+export interface BookDetail {
+  bookUid: string;
+  accountUid?: string | null;
+  title: string;
+  bookSpecUid?: string | null;
+  bookSpecName?: string | null;
+  specProfileUid?: string | null;
+  creationType?: CreationType | string | null;
+  /** 1=DRAFT, 2=FINALIZED, 9=DELETED */
+  status: number;
+  coverTemplateUid?: string | null;
+  externalRef?: string | null;
+  isTest: boolean;
+  pageMeta: PageMeta;
+  createdAt: string;
+  updatedAt: string;
+  [extra: string]: unknown;
 }
 
 export interface BookListItem {
@@ -67,6 +205,7 @@ export interface BookListItem {
   accountUid?: string | null;
   title: string;
   author?: string | null;
+  /** 목록 응답에서는 문자열 enum */
   status: "draft" | "finalized" | string;
   pageCount: number;
   bookSpecUid?: string | null;
@@ -83,9 +222,14 @@ export interface BookListItem {
   [extra: string]: unknown;
 }
 
+/**
+ * BooksClient.list() 반환값.
+ * 서버 응답이 평탄화되었지만 SDK는 `{ books, pagination }` 형태로 보존 (호환).
+ */
 export interface BooksListResult {
   books: BookListItem[];
   pagination: Pagination;
+  [extra: string]: unknown;
 }
 
 export interface BookListParams {
@@ -96,14 +240,16 @@ export interface BookListParams {
 
 export interface BookFinalizationResponse {
   result: string;
-  pageCount: number;
-  finalizedAt: string;
+  pageMeta: PageMeta;
+  finalizedAt?: string;
+  [extra: string]: unknown;
 }
 
 export class BooksClient {
   list(params?: BookListParams): Promise<BooksListResult>;
   create(data: BookCreateRequest): Promise<BookCreateResponse>;
-  get(bookUid: string): Promise<BookListItem>;
+  /** RESTful 단건 조회 — pageMeta 포함 */
+  get(bookUid: string): Promise<BookDetail>;
   finalize(bookUid: string): Promise<BookFinalizationResponse>;
   delete(bookUid: string): Promise<unknown>;
 }
@@ -116,6 +262,8 @@ export interface CoverData {
   bookUid: string;
   templateUid?: string;
   pageNum?: number;
+  /** 표지는 카운트 영향 없음, 현재 내지 상태 보고용 */
+  pageMeta?: PageMeta;
   createdAt?: string;
   updatedAt?: string;
   [extra: string]: unknown;
@@ -150,6 +298,8 @@ export interface ContentInsertResult {
   pageNum?: number;
   /** 페이지 사이드 (서버 cursor.pageSide) */
   pageSide?: string;
+  /** 누적 페이지 메타 */
+  pageMeta?: PageMeta;
   [extra: string]: unknown;
 }
 
@@ -226,7 +376,11 @@ export interface OrderListItem {
   accountUid: string;
   orderType: string;
   externalRef?: string | null;
-  orderStatus: number;
+  /** 문자열 enum (PAID, PDF_READY, ...) — v0.2.0 부터 string */
+  orderStatus: OrderStatusValue | string;
+  /** 관리자 응답에만 노출되는 숫자 코드 */
+  orderStatusCode?: number;
+  /** 한글 표시 문자열 ("결제완료" 등) */
   orderStatusDisplay: string;
   totalAmount: number;
   paidCreditAmount: number;
@@ -239,15 +393,22 @@ export interface OrderListItem {
   [extra: string]: unknown;
 }
 
+/**
+ * OrdersClient.list() 반환값.
+ * 서버 응답은 평탄화 (data: [...], pagination 최상위) 되었지만,
+ * SDK 는 `{ orders, pagination }` 형태로 호환 유지 (구버전 호환 래퍼).
+ */
 export interface OrderListResponse {
   orders: OrderListItem[];
   pagination: Pagination;
+  [extra: string]: unknown;
 }
 
 export interface OrderListParams {
   limit?: number;
   offset?: number;
-  status?: string;
+  /** 문자열 enum 권장 (OrderStatus.*) 또는 숫자 코드 */
+  status?: OrderStatusValue | string | number;
   from?: string;
   to?: string;
 }
@@ -262,7 +423,10 @@ export interface OrderItemDetail {
   pageCount: number;
   unitPrice: number;
   itemAmount: number;
-  itemStatus: number;
+  /** 문자열 enum (PAID, PDF_READY, ...) */
+  itemStatus: OrderStatusValue | string;
+  /** 관리자 응답에만 노출 */
+  itemStatusCode?: number;
   itemStatusDisplay: string;
   trackingNumber?: string | null;
   trackingCarrier?: string | null;
@@ -276,7 +440,8 @@ export interface OrderDetailResponse {
   accountUid: string;
   orderType: string;
   externalRef?: string | null;
-  orderStatus: number;
+  orderStatus: OrderStatusValue | string;
+  orderStatusCode?: number;
   orderStatusDisplay: string;
   isTest: boolean;
   totalProductAmount: number;
@@ -368,7 +533,7 @@ export class BookSpecsClient {
 }
 
 // ============================================================
-// Templates — 목록/상세 조회 (읽기 전용)
+// Templates — 목록/상세/스키마 조회 (읽기 전용)
 // ============================================================
 
 export type TemplateScope = "public" | "private" | "all";
@@ -418,9 +583,37 @@ export interface TemplateDetail {
   [extra: string]: unknown;
 }
 
+/**
+ * GET /templates/{uid}/schema — JSON Schema draft-07 응답.
+ * AI 에이전트 / 페이로드 검증 / codegen 용도.
+ */
+export interface TemplateSchema {
+  $schema: string;
+  $id: string;
+  title: string;
+  description?: string;
+  type: "object";
+  properties: Record<
+    string,
+    {
+      type: string;
+      description?: string;
+      format?: string;
+      items?: { type: string; format?: string };
+      "x-binding"?: "text" | "file" | "gallery" | "collageGallery" | "rowGallery" | string;
+      [extra: string]: unknown;
+    }
+  >;
+  required: string[];
+  "x-templateKind"?: string;
+  [extra: string]: unknown;
+}
+
 export class TemplatesClient {
   list(params?: TemplateListParams): Promise<TemplatesListResult>;
   get(templateUid: string, options?: { accountUid?: string }): Promise<TemplateDetail>;
+  /** 템플릿 파라미터 스키마 (JSON Schema draft-07) — v0.2.0 신규 */
+  getSchema(templateUid: string): Promise<TemplateSchema>;
 }
 
 // ============================================================
@@ -435,6 +628,8 @@ export interface PdfUploadResult {
   valid?: boolean;
   /** 페이지 수 (내지 PDF) */
   pageCount?: number;
+  /** 누적 페이지 메타 */
+  pageMeta?: PageMeta;
   /** 검증 메시지 */
   messages?: string[];
   [extra: string]: unknown;
@@ -500,12 +695,21 @@ export class SweetbookClient {
 export class SweetbookApiError extends Error {
   /** HTTP 상태 코드 */
   statusCode?: number;
-  /** 서버 error_code (있는 경우) */
-  errorCode?: string | null;
-  /** ApiResponse.Fail 의 errors 배열 (또는 legacy error.details) */
-  details?: string[] | unknown | null;
+  /** errorCode 식별자 (ERR_*) — 항상 존재 */
+  errorCode?: ErrorCode | string | null;
+  /** errors[] — 사용자 표시용 한글 메시지 배열 */
+  details?: string[] | null;
+  /** fieldErrors[] — 필드 단위 구조화 에러 */
+  fieldErrors: FieldError[];
+  /** data 필드 — 일반적으로 null, 일부 errorCode (INSUFFICIENT_CREDIT 등) 에서 진단 객체 */
+  data?: unknown;
   /** 원본 Response 객체 */
   response?: Response;
+
+  /** field 이름으로 FieldError 찾기 */
+  fieldError(name: string): FieldError | null;
+  /** errors[0] 또는 message fallback */
+  userMessage(): string;
 }
 
 export class SweetbookNetworkError extends Error {
@@ -519,8 +723,17 @@ export class SweetbookValidationError extends Error {
 
 export class ResponseParser {
   constructor(body: unknown);
+  readonly success: boolean;
   getData(): unknown;
+  getList(): unknown[];
   getDict(): Record<string, unknown>;
+  getMeta(): Record<string, unknown>;
+  getPagination(): Pagination | Record<string, unknown>;
+  getErrorCode(): ErrorCode | string | null;
+  getErrors(): string[];
+  getFieldErrors(): FieldError[];
+  getFieldError(field: string): FieldError | null;
+  getPageMeta(): PageMeta | Record<string, never>;
 }
 
 // ============================================================
