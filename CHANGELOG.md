@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.1 (2026-04-29)
+
+마이그레이션 회귀테스트 후 list 엔드포인트 SDK 본체 회귀 수정 + examples 핫픽스.
+
+### Fixed
+- `BooksClient.list` / `OrdersClient.list` / `PhotosClient.list` / `TemplatesClient.list` — v1 평탄화 응답(`data: [...]` + 최상위 `pagination`)에서 `getDict()`로 끝나 빈 객체를 반환하던 본체 회귀. 신규 헬퍼 `ResponseParser.toListResult(key)` 도입하여 `{ [key]: [...], pagination: {...} }` 정규화 형태로 반환. 신/구 응답 shape 모두 호환
+- `examples/02_order.js` — 책 목록 접근을 `booksResp.books || booksResp.data` 폴백 패턴으로 수정 (v0.2.1 본체 수정과 정합, v0.2.0 SDK 본체에서도 안전하게 동작하도록)
+
+### Added
+- `ResponseParser.toListResult(key)` — 리스트 엔드포인트 응답을 평탄화 후에도 일관된 shape으로 정규화하는 신규 헬퍼. `index.d.ts` 타입 동반 갱신
+- `PhotosClient.list` 반환 타입을 `Record<string, unknown>` → `{ photos: [...]; pagination: Pagination }` 로 구체화
+
+### Migration Notes (v0.2.0 → v0.2.1)
+- 0.2.0에서 `await client.books.list(...)` 결과가 빈 객체로 보이던 사용자는 0.2.1 업그레이드 시 `result.books` / `result.pagination` 으로 접근 가능
+- `BookSpecsClient.list`는 변경 없음 (서버 응답이 원래 배열 형태로 와서 `getData()` 그대로 반환)
+
 ## 0.2.0 (2026-04-28)
 
 서버 master 대비 develop 브랜치 변경사항(99번 v1 적용분) 반영.

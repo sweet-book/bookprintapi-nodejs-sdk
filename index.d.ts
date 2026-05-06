@@ -660,7 +660,7 @@ export interface PhotosClient {
     file: TemplateFile,
     options?: { preserveExif?: boolean },
   ): Promise<Record<string, unknown>>;
-  list(bookUid: string): Promise<Record<string, unknown>>;
+  list(bookUid: string): Promise<{ photos: Record<string, unknown>[]; pagination: Pagination }>;
   delete(bookUid: string, fileName: string): Promise<unknown>;
 }
 
@@ -734,6 +734,7 @@ export class ResponseParser {
   getFieldErrors(): FieldError[];
   getFieldError(field: string): FieldError | null;
   getPageMeta(): PageMeta | Record<string, never>;
+  toListResult<K extends string>(key: K): { [P in K]: unknown[] } & { pagination: Pagination };
 }
 
 // ============================================================

@@ -28,8 +28,9 @@ async function main() {
   }
 
   // 2. FINALIZED 책 목록 조회
-  const books = await client.books.list({ status: 'finalized' });
-  const bookList = books.data || [];
+  // v1: { books: [...], pagination: {...} } 평탄화. 구버전 호환: books.data.
+  const booksResp = await client.books.list({ status: 'finalized' });
+  const bookList = booksResp.books || booksResp.data || [];
   if (bookList.length === 0) {
     console.log('FINALIZED 상태 책이 없습니다. 먼저 01_create_book.js를 실행하세요.');
     return;
