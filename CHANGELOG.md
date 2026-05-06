@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.2.2 (2026-05-06)
+
+### Fixed
+- `covers.create` / `contents.insert` 의 multipart 파일 part 이름 회귀 정정.
+  서버는 **템플릿이 정의한 binding 이름**(예: `coverPhoto`, `mainPhoto`) 을 multipart part name 으로
+  요구합니다. 0.2.1 까지의 SDK 는 모든 파일을 `files` (Covers) / `rowPhotos` (Contents) 단일
+  필드명으로 보내 서버가 `필수 이미지 파라미터 'X' 가 제공되지 않았습니다` 로 거부했습니다.
+
+### Added
+- `covers.create(bookUid, templateUid, parameters, { bindingFiles: { coverPhoto: file } })` — binding 매핑 (권장)
+- `contents.insert(bookUid, templateUid, parameters, { bindingFiles: { mainPhoto: f1, subPhoto: f2 } })` — 동일 패턴
+- `_buildTemplateFormData(templateUid, parameters, { bindingFiles, files, fileFieldName })` — 새 옵션 객체 시그니처
+
+### Deprecated
+- `covers.create(..., Array<File>)` — Array 형태로 4번째 인자를 받던 구 시그니처. 호환 보존하나 `process.emitWarning` 출력
+- `contents.insert(..., { files: [...] })` — `bindingFiles` 로 대체. 호환 보존
+- 새 메이저 버전에서 제거 예정
+
+### Migration
+
+```js
+// Before (v0.2.1, 깨짐)
+await client.covers.create(bookUid, templateUid, parameters, [file]);
+
+// After (v0.2.2)
+await client.covers.create(bookUid, templateUid, parameters, {
+  bindingFiles: { coverPhoto: file },  // binding 이름은 template 정의에 맞춰
+});
+```
+
+### Notes
+- Java SDK / Python SDK 0.2.2 도 같은 회귀 정정. 모두 v0.2.2 동일 동작.
+- 발견 경위: Java SDK 통합 테스트가 sandbox 99 에서 3시나리오 검증 → 서버는 binding 이름이 정답.
+
 ## 0.2.1 (2026-04-29)
 
 마이그레이션 회귀테스트 후 list 엔드포인트 SDK 본체 회귀 수정 + examples 핫픽스.
