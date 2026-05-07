@@ -70,6 +70,39 @@ index.js         # 진입점
 | `client.orders` | `estimate`, `create`, `list`, `get`, `cancel`, `updateShipping` | 주문 |
 | `client.credits` | `getBalance`, `transactions`, `sandboxCharge` | 충전금 |
 
+## 표지/내지에 사진 첨부 (multipart)
+
+서버는 multipart 파일 part name 으로 **템플릿이 정의한 binding 이름**을 요구합니다 (예: `coverPhoto`, `mainPhoto`). v0.2.2부터 다음 두 가지 방식이 모두 지원됩니다:
+
+```javascript
+// (A) 사진을 미리 업로드하고 parameters 에 fileName 으로 참조 (사진 재사용 시 효율적)
+const upload = await client.photos.upload(bookUid, file);  // file: Blob/File/Buffer
+const fileName = upload.fileName;
+await client.covers.create(bookUid, COVER_TEMPLATE_UID, {
+  title: 'My Book',
+  coverPhoto: fileName,   // binding 이름은 템플릿 정의에 맞춰
+});
+
+// (B) multipart 로 직접 첨부 — binding 이름을 키로 사용 (v0.2.2+)
+await client.covers.create(bookUid, COVER_TEMPLATE_UID,
+  { title: 'My Book' },
+  { bindingFiles: { coverPhoto: file } },
+);
+
+// 내지에 여러 사진
+await client.contents.insert(bookUid, CONTENT_TEMPLATE_UID,
+  { date: '2026-01-01' },
+  {
+    bindingFiles: { mainPhoto: f1, subPhoto: f2 },
+    breakBefore: 'page',
+  },
+);
+```
+
+> ⚠️ 0.2.1 이전의 `client.covers.create(bookUid, tplUid, parameters, [file])` 형태(4번째 인자 `Array<File>`)는
+> 모든 파일을 단일 `files` 필드명으로 보내 서버가 거부합니다. 0.2.2부터는 `{ bindingFiles: { ... } }` 사용 필수
+> (옛 Array 형태는 호환 보존하지만 동작 X).
+
 ## 예제
 
 ### 1. 책 생성 → 표지 → 내지 → 최종화
