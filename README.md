@@ -123,7 +123,16 @@ node examples/02_order.js
 node examples/03_webhook_server.js
 ```
 
-### 4. 책 생성 → 주문 E2E 파이프라인
+### 4. SDK 헬퍼 (v0.3.0+) — 한 호출 시나리오
+
+```bash
+node examples/04_helpers.js template <coverTplUid> <contentTplUid> <photoPath>
+node examples/04_helpers.js pdf <coverPdfPath> <contentsPdfPath>
+```
+
+`createBookFromTemplate` / `uploadPdfAndOrder` 사용 + 단계별 실패 분기 패턴 (cleanup 의사결정 포함).
+
+### 5. 책 생성 → 주문 E2E 파이프라인 (저수준 sub-client)
 
 ```bash
 node examples/server_pipeline.js
