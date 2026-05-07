@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.3.0 (2026-05-07)
+
+### Added — SDK 헬퍼 (다단계 플로우 한 호출)
+
+설계 문서 `11_sdk_helpers_design.md` v0.1 구현. R011-S01 (16p 책에 35+ API 호출) / C08 (다단계 실패 컨텍스트) 대응.
+
+- **`client.helpers.createBookFromTemplate(input)`** — TEMPLATE 모드 책 + 표지 + 내지 N + finalize 한 호출. 반환 `BookBuildResult` (bookUid / coverPageNum / contentPages / finalized / pageCount)
+- **`client.helpers.uploadPdfAndOrder(input)`** — PDF_UPLOAD 모드 책 + PDF 2종 + finalize + 견적 + 주문 한 호출. 반환 `PdfOrderBuildResult` (bookUid / orderUid / finalized / estimate / order). `options.failOnInsufficientCredit` (기본 true) 로 estimate `creditSufficient=false` 시 주문 전 차단
+
+### 새 예외: `SweetbookHelperError`
+- `stage`: `HelperStage` 상수 — `BOOK_CREATE` / `COVER_CREATE` / `CONTENT_INSERT` / `BOOK_FINALIZE` / `PDF_UPLOAD_COVER` / `PDF_UPLOAD_CONTENTS` / `ORDER_ESTIMATE` / `ORDER_CREATE` / `VALIDATION`
+- `code`: `HelperErrorCodes.SDK_HLPR_*` 임시 코드 (C03 확정 시 표준 errorCode 로 매핑)
+- `bookUid`: `BOOK_CREATE` 성공 후부터. `client.books.delete(e.bookUid)` 명시적 cleanup 가능
+- `partial`: 단계별 부분 성공 정보 (`bookCreated` / `coverCreated` / `contentsInserted[]` / `finalized` 등)
+- `cause`: 원 `SweetbookApiError` 예외 보존
+- `contentIndex`: `CONTENT_INSERT` 실패 시 0-based 페이지 index
+- `userMessage()`: cause 가 `SweetbookApiError` 면 그쪽으로 위임
+
+### Tests
+- `tests/helpers.test.js` 16건 (Node 내장 `node:test` 사용, 외부 의존성 0)
+- `npm test` 추가 — 16/16 통과
+
+### TypeScript
+- `index.d.ts` 에 `HelpersClient` / `CreateBookFromTemplateInput` / `UploadPdfAndOrderInput` / `BookBuildResult` / `PdfOrderBuildResult` / `SweetbookHelperError` / `HelperStage` / `HelperErrorCodes` 타입 추가
+- `Photos` / `Credits` / `Webhook` 도 strong-typed 인터페이스로 강화 (PhotoUploadResponse / CreditsBalance / CreditsTransaction 등)
+
+### 정책 (설계 §4)
+- 자동 재시도 안 함 (트랜스포트 레이어 재시도만)
+- 자동 롤백 안 함 — 파트너가 `partial` / `bookUid` 보고 명시적 결정
+- 호출 전 클라이언트측 검증 (`bookSpec.uid` / `contents ≥ 1` / `order.shipping.recipientName` 등)
+
+### Migration
+v0.2.x → v0.3.0 은 추가 only. 기존 `client.books.create` 등 동작 그대로. 헬퍼는 옵트인.
+
+```js
+const { SweetbookClient, SweetbookHelperError, HelperStage } = require('bookprintapi-nodejs-sdk');
+const c = new SweetbookClient({ apiKey: '...' });
+
+try {
+  const result = await c.helpers.createBookFromTemplate({
+    bookSpec: { uid: 'PHOTOBOOK_A4_SC' },
+    cover: { templateUid: 'cv_xxx', params: { title: 'My Book' } },
+    contents: [
+      { templateUid: 'p_xxx', params: { ... }, bindingFiles: { mainPhoto: file1 } },
+    ],
+    options: { externalRef: 'ORDER-123' },
+  });
+} catch (e) {
+  if (e instanceof SweetbookHelperError) {
+    if (e.stage === HelperStage.CONTENT_INSERT && e.bookUid) {
+      // 책은 남기고 사용자에게 재입력
+    } else if (e.bookUid) {
+      await c.books.delete(e.bookUid);
+    }
+  }
+  throw e;
+}
+```
+
 ## 0.2.2 (2026-05-06)
 
 ### Fixed

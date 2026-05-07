@@ -8,12 +8,15 @@
  *   const book = await client.books.create({ bookSpecUid: 'SQUAREBOOK_HC', title: 'My Book' });
  */
 
-const { SweetbookClient } = require('./lib/client');
+const { SweetbookClient, HelpersClient } = require('./lib/client');
 const {
   FieldError,
   SweetbookApiError,
   SweetbookNetworkError,
   SweetbookValidationError,
+  SweetbookHelperError,
+  HelperStage,
+  HelperErrorCodes,
   ResponseParser,
 } = require('./lib/core');
 const { ErrorCodes, ConstraintTypes } = require('./lib/errorcodes');
@@ -22,10 +25,14 @@ const { verifySignature } = require('./lib/webhook');
 
 module.exports = {
   SweetbookClient,
+  HelpersClient,
   FieldError,
   SweetbookApiError,
   SweetbookNetworkError,
   SweetbookValidationError,
+  SweetbookHelperError,
+  HelperStage,
+  HelperErrorCodes,
   ResponseParser,
   ErrorCodes,
   ConstraintTypes,

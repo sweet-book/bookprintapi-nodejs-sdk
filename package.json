@@ -1,10 +1,11 @@
 {
   "name": "bookprintapi-nodejs-sdk",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Sweetbook API Node.js SDK",
   "main": "index.js",
   "types": "index.d.ts",
   "scripts": {
+    "test": "node --test tests/helpers.test.js",
     "example:book": "node examples/01_create_book.js",
     "example:order": "node examples/02_order.js",
     "example:webhook": "node examples/03_webhook_server.js"

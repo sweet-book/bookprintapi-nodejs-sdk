@@ -654,25 +654,101 @@ export class PdfsClient {
 // Photos / Credits — 향후 번들 대상, 현재는 느슨한 타입으로만 노출
 // ============================================================
 
+/** 사진 업로드 응답 (`POST /books/{bookUid}/photos`) */
+export interface PhotoUploadResponse {
+  /** 서버가 발급한 파일명. 후속 covers/contents 호출 시 parameters 의 binding 값으로 참조. */
+  fileName: string;
+  /** 업로드된 파일 크기 (bytes) */
+  size: number;
+  /** 콘텐츠 타입 (예: "image/jpeg") */
+  contentType?: string;
+  /** 너비/높이 (px). 서버가 EXIF 또는 디코딩으로 추출 시 노출 */
+  width?: number;
+  height?: number;
+  /** 업로드 시각 (UTC ISO) */
+  uploadedAt?: string;
+}
+
+/** 업로드된 사진의 목록 항목 */
+export interface PhotoListItem {
+  fileName: string;
+  size?: number;
+  contentType?: string;
+  width?: number;
+  height?: number;
+  uploadedAt?: string;
+}
+
 export interface PhotosClient {
+  /**
+   * 사진 1장 업로드 (multipart `file` 필드).
+   * @param file `Blob` / `File` / `Buffer` (Node 18+)
+   */
   upload(
     bookUid: string,
     file: TemplateFile,
     options?: { preserveExif?: boolean },
-  ): Promise<Record<string, unknown>>;
-  list(bookUid: string): Promise<{ photos: Record<string, unknown>[]; pagination: Pagination }>;
+  ): Promise<PhotoUploadResponse>;
+  list(bookUid: string): Promise<{ photos: PhotoListItem[]; pagination: Pagination }>;
   delete(bookUid: string, fileName: string): Promise<unknown>;
 }
 
+/** 충전금 잔액 응답 (`GET /credits`) */
+export interface CreditsBalance {
+  accountUid: string;
+  /** 현재 잔액 (KRW). decimal 가능성 있어 number 로 노출 */
+  balance: number;
+  currency: string;
+  createdAt?: string;
+  updatedAt?: string;
+  /** 환경 식별 — "test" / "live" */
+  env?: 'test' | 'live' | string;
+}
+
+/** 충전금 거래 내역 항목 */
+export interface CreditsTransaction {
+  transactionId: number;
+  accountUid: string;
+  /** 사유 코드 (서버 enum). 표시용은 reasonDisplay */
+  reasonCode: number;
+  reasonDisplay: string;
+  /** "+" 충전 / "-" 차감 */
+  direction: '+' | '-' | string;
+  currency: string;
+  amount: number;
+  /** 거래 후 잔액 */
+  balanceAfter: number;
+  memo?: string;
+  createdAt: string;
+  isTest?: boolean;
+}
+
+/** Sandbox 충전 응답 (`POST /credits/sandbox/charge`) */
+export interface SandboxChargeResponse {
+  accountUid: string;
+  /** 충전 후 잔액 */
+  balance: number;
+  currency: string;
+  amount: number;
+  /** 거래 ID (충전 트랜잭션) */
+  transactionId?: number;
+}
+
 export interface CreditsClient {
-  getBalance(): Promise<Record<string, unknown>>;
+  /** 잔액 조회 */
+  getBalance(): Promise<CreditsBalance>;
+  /** 거래 내역. `data.transactions[]` 를 자동 평탄화. */
   transactions(params?: {
     limit?: number;
     offset?: number;
     from?: string;
     to?: string;
-  }): Promise<Record<string, unknown>>;
-  sandboxCharge(amount: number, memo?: string): Promise<Record<string, unknown>>;
+  }): Promise<{ transactions: CreditsTransaction[]; pagination: Pagination }>;
+  /**
+   * Sandbox 환경 한정 — 가짜 충전금 부여.
+   * Live 환경에서 호출 시 `ERR_SANDBOX_UNSUPPORTED` (501).
+   */
+  sandboxCharge(amount: number, memo?: string): Promise<SandboxChargeResponse>;
 }
 
 // ============================================================
@@ -690,6 +766,114 @@ export class SweetbookClient {
   readonly pdfs: PdfsClient;
   readonly templates: TemplatesClient;
   readonly bookSpecs: BookSpecsClient;
+  readonly helpers: HelpersClient;
+}
+
+// ============================================================
+// Helpers — 다단계 플로우 한 호출 (11_sdk_helpers_design.md v0.1)
+// ============================================================
+
+export const HelperStage: {
+  readonly VALIDATION: 'VALIDATION';
+  readonly BOOK_CREATE: 'BOOK_CREATE';
+  readonly COVER_CREATE: 'COVER_CREATE';
+  readonly CONTENT_INSERT: 'CONTENT_INSERT';
+  readonly BOOK_FINALIZE: 'BOOK_FINALIZE';
+  readonly PDF_UPLOAD_COVER: 'PDF_UPLOAD_COVER';
+  readonly PDF_UPLOAD_CONTENTS: 'PDF_UPLOAD_CONTENTS';
+  readonly ORDER_ESTIMATE: 'ORDER_ESTIMATE';
+  readonly ORDER_CREATE: 'ORDER_CREATE';
+};
+
+export type HelperStageValue = typeof HelperStage[keyof typeof HelperStage];
+
+export const HelperErrorCodes: {
+  readonly BOOK_CREATE_FAILED: 'SDK_HLPR_BOOK_CREATE_FAILED';
+  readonly COVER_CREATE_FAILED: 'SDK_HLPR_COVER_CREATE_FAILED';
+  readonly CONTENT_INSERT_FAILED: 'SDK_HLPR_CONTENT_INSERT_FAILED';
+  readonly PDF_UPLOAD_FAILED: 'SDK_HLPR_PDF_UPLOAD_FAILED';
+  readonly FINALIZE_FAILED: 'SDK_HLPR_FINALIZE_FAILED';
+  readonly CREDIT_INSUFFICIENT: 'SDK_HLPR_CREDIT_INSUFFICIENT';
+  readonly ORDER_ESTIMATE_FAILED: 'SDK_HLPR_ORDER_ESTIMATE_FAILED';
+  readonly ORDER_CREATE_FAILED: 'SDK_HLPR_ORDER_CREATE_FAILED';
+  readonly VALIDATION: 'SDK_HLPR_VALIDATION';
+};
+
+export type HelperErrorCode = typeof HelperErrorCodes[keyof typeof HelperErrorCodes];
+
+export class SweetbookHelperError extends Error {
+  stage: HelperStageValue;
+  code: HelperErrorCode | string;
+  bookUid: string | null;
+  orderUid: string | null;
+  partial: Record<string, unknown>;
+  cause: Error | SweetbookApiError | null;
+  contentIndex: number | null;
+  userMessage(): string;
+}
+
+export interface CreateBookFromTemplateInput {
+  bookSpec: { uid: string };
+  cover: {
+    templateUid: string;
+    params?: Record<string, unknown>;
+    bindingFiles?: Record<string, TemplateFile>;
+  };
+  contents: Array<{
+    templateUid: string;
+    params?: Record<string, unknown>;
+    bindingFiles?: Record<string, TemplateFile>;
+    breakBefore?: 'page' | 'spread' | 'column';
+  }>;
+  options?: {
+    title?: string;
+    externalRef?: string;
+    specProfileUid?: string;
+    skipFinalize?: boolean;
+  };
+}
+
+export interface BookBuildResult {
+  bookUid: string;
+  coverPageNum: number | null;
+  contentPages: Array<{ pageNum: number | null; pageSide: string | null }>;
+  finalized: boolean;
+  pageCount: number | null;
+  raw: { book: unknown; cover: unknown; finalize: unknown };
+}
+
+export interface UploadPdfAndOrderInput {
+  bookSpec: { uid: string; pageCount: number };
+  pdfs: { cover: TemplateFile; contents: TemplateFile };
+  order: {
+    shipping: Record<string, unknown>;
+    quantity?: number;
+    externalRef?: string;
+  };
+  options?: {
+    title?: string;
+    bookExternalRef?: string;
+    specProfileUid?: string;
+    /** 기본 true. estimate.creditSufficient=false 일 때 주문 전 SweetbookHelperError 던짐 */
+    failOnInsufficientCredit?: boolean;
+    /** 기본 false. true 면 estimate 생략하고 바로 orders.create */
+    skipEstimate?: boolean;
+  };
+}
+
+export interface PdfOrderBuildResult {
+  bookUid: string;
+  coverPdf: unknown;
+  contentsPdf: unknown;
+  finalized: boolean;
+  estimate: unknown | null;
+  order: unknown;
+  orderUid: string | null;
+}
+
+export interface HelpersClient {
+  createBookFromTemplate(input: CreateBookFromTemplateInput): Promise<BookBuildResult>;
+  uploadPdfAndOrder(input: UploadPdfAndOrderInput): Promise<PdfOrderBuildResult>;
 }
 
 export class SweetbookApiError extends Error {
@@ -743,10 +927,29 @@ export class ResponseParser {
 
 /**
  * 웹훅 서명 검증 (HMAC-SHA256).
- * @returns 유효하면 true, 아니면 false
+ *
+ * 서버가 보내는 헤더:
+ * ```
+ * X-Sweetbook-Signature: <hex>
+ * X-Sweetbook-Timestamp: <unix seconds>
+ * ```
+ *
+ * 검증 규칙:
+ * - `timestamp` 가 주어지면 `${timestamp}.${payload}` 를 HMAC-SHA256(secret) 으로 서명한 hex 와 비교
+ * - 주어지지 않으면 `payload` 만으로 서명 비교 (구버전 호환)
+ * - `timestamp` 가 현재 시각에서 `tolerance` 초 이상 벌어지면 false
+ *
+ * @param payload 원본 요청 본문 (raw)
+ * @param signature `X-Sweetbook-Signature` 헤더 값
+ * @param secret 웹훅 시크릿 키
+ * @param timestamp `X-Sweetbook-Timestamp` 헤더 값 (선택)
+ * @param tolerance 타임스탬프 허용 오차 (초, 기본 300=5분)
+ * @returns 유효하면 true, 아니면 false (예외 안 던짐)
  */
 export function verifySignature(
-  body: string | Buffer,
-  signatureHeader: string,
+  payload: string | Buffer,
+  signature: string,
   secret: string,
+  timestamp?: string | number,
+  tolerance?: number,
 ): boolean;
