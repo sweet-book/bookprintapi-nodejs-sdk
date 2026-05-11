@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.4.0 (2026-05-11)
+
+### Added — list 응답 envelope 통일 호환 강화
+
+photobook-api commit `6fbf346` (2026-05-11) 의 list 응답 envelope 평탄화에 대응. v0.2.1 부터 `ResponseParser.toListResult` 가 신·구 envelope 양쪽 분기를 지원하던 토대 위에 다음을 보강.
+
+- **`ResponseParser.getList`**: 인식 키 19개로 확장 — `orders` / `items` / `books` / `templates` / `photos` / `keys` / `accounts` / `memos` / `configs` / `deliveries` / `notifications` / `categories` / `transactions` / `targetTypes` / `daily` / `referrers` / `events` / `logs` / `bookSpecs`. 마지막 fallback 으로 `data` 객체의 첫 번째 배열 자동 채택
+- **`ResponseParser.getPagination`**: 구 photos 응답의 `data.totalCount` 를 `pagination.total` 로 자동 흡수
+- **`ResponseParser.toListResult`**: 빈 pagination 일 때 응답에 포함하지 않음 (`template-categories` 등 pagination 없는 list 응답이 깔끔)
+- **`client.bookSpecs.list`** / **`client.credits.transactions`**: 기존 `getData()` / `getDict()` → `toListResult` 사용으로 통일 (신 envelope 의 배열 data 대응)
+
+### 변경된 envelope 명세
+
+**Before** (구):
+```json
+{ "success": true, "data": { "books": [...], "pagination": {...} } }
+```
+
+**After** (신, commit 6fbf346 이후):
+```json
+{
+  "success": true,
+  "data": [...],
+  "pagination": { "total": 120, "limit": 20, "offset": 0, "hasNext": true }
+}
+```
+
+SDK 사용자는 두 envelope 모두에서 `result.books` (또는 `result.orders` 등 toListResult 의 key) 가 항상 배열, `result.pagination` 이 항상 최상위 — 동일한 코드로 두 시점 모두 호환.
+
+### Tests
+- `tests/response_envelope.test.js` 8건 추가 (신·구 envelope, totalCount 흡수, 확장 키, 엣지 케이스)
+- `npm test` 24/24 통과 (helpers 16 + envelope 8)
+
+### Migration
+v0.3.x → v0.4.0: 추가 호환 only. 기존 list 메서드 시그니처/리턴 shape 그대로.
+
+이슈: https://github.com/sweet-book/bookprintapi-nodejs-sdk/issues/3
+
 ## 0.3.0 (2026-05-07)
 
 ### Added — SDK 헬퍼 (다단계 플로우 한 호출)
