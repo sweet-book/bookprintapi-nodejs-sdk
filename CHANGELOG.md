@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.1 (2026-05-12)
+
+### Fixed — `books.create()` 의 `pageCount` 명시 처리
+
+`creationType=PDF_UPLOAD` / `MIX_COVER_TEMPLATE` 시 서버가 `pageCount` 필수로 요구하나, 기존 SDK 는 `...extraData` 로 흡수만 하고 명시적 검증/타입 힌트가 없어 누락 시 서버 400 으로 발견되던 갭 보정.
+
+- **`books.create({ ..., pageCount })`** — 시그니처에서 명시적으로 분리·검증
+- `creationType=PDF_UPLOAD` / `MIX_COVER_TEMPLATE` 인데 `pageCount` 가 `number` 가 아니거나 `<=0` 이면 즉시 `SweetbookValidationError` (field: `pageCount`)
+- `creationType=TEMPLATE` 에서 `pageCount` 를 보내도 payload 에 포함만 함 (서버가 무시)
+- TypeScript `BookCreateRequest.pageCount?: number` 는 이전부터 선언돼 있었으므로 타입 변경 없음
+
+### Backward compatibility
+
+기존 `creationType=TEMPLATE` 호출자는 영향 없음. `extraData` 로 `pageCount` 보내던 호출자도 그대로 동작.
+
 ## 0.4.0 (2026-05-11)
 
 ### Added — list 응답 envelope 통일 호환 강화
